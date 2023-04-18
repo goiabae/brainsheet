@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 #include <getopt.h>
+#include <errno.h>
 
 typedef struct Dimension {
 	long height;
@@ -81,7 +82,7 @@ long matrix_at(long w, long x, long y) {
 	return w * y + x;
 }
 
-Table new_table(long h, long w) {
+Table table_init(long h, long w) {
 	Table t = {
 		.h = h,
 		.w = w,
@@ -107,7 +108,7 @@ Table new_table(long h, long w) {
 	return t;
 }
 
-void delete_table(Table t) {
+void table_deinit(Table t) {
 	// free selection list
 	while (t.sels.list) {
 		SelectionNode* tail = t.sels.list->next;
@@ -284,7 +285,7 @@ void run_op(Table* t) {
 	return;
 }
 
-void run_table(Table* t) {
+void table_run(Table* t) {
 	while (! t->is_halt) {
 		if (t->cells[matrix_at(t->w, t->cx, t->cy)].type == OP) {
 			run_op(t);
@@ -369,7 +370,7 @@ void parse_op(Cell* cell, char buf[50]) {
 	cell->op = op;
 }
 
-void parse_table(Table* t, FILE* fd) {
+bool table_from_fd(Table* t, FILE* fd) {
 	char buf[50];
 	long x, y;
 	char id_buf[50];
@@ -378,6 +379,15 @@ void parse_table(Table* t, FILE* fd) {
 		fgets(buf, 50, fd);
 		sscanf(buf, "%ld %ld %s\n", &x, &y, id_buf);
 
+		if (x > (t->w - 1)) {
+			printf("ERROR PARSE: cell (%ld, %ld) with coordinates exceeding table width\n", x, y);
+			return false;
+		}
+		if (y > (t->h - 1)) {
+			printf("ERROR PARSE: cell (%ld, %ld) with coordinates exceeding table height\n", x, y);
+			return false;
+		}
+
 		if (id_buf[0] == '\'')
 			parse_character(&t->cells[matrix_at(t->w, x, y)], id_buf);
 		else if ('0' >= id_buf[0] && id_buf[0] <= 0)
@@ -385,40 +395,88 @@ void parse_table(Table* t, FILE* fd) {
 		else
 			parse_op(&t->cells[matrix_at(t->w, x, y)], id_buf);
 	}
+	return true;
 }
 
-int main(int argc, char* argv[argc]) {
-	if ((argc - 1) < 3) {
-		usage();
-		return 1;
+long read_num(char* str, int* success) {
+	char* endptr;
+	long res = strtol(str, &endptr, 10);
+	if (str == endptr) {
+		printf("ERROR PARSE: couldn't read number from string \"%s\"", str);
+		*success = 1;
 	}
+	return res;
+}
 
+/*** BEGIN OPTIONS ***/
+struct options {
+	bool help;
+};
+
+struct options parse_opts(int argc, char** argv) {
+	struct options res = (struct options) {
+		.help = false,
+	};
 	int opt;
+
+	if ((argc - 1) < 3)
+		res.help = true;
+
 	while (-1 != (opt = getopt(argc, argv, "h"))) {
 		switch (opt) {
 		case 'h':
-			usage();
-			goto exit;
+			res.help = true;
 			break;
 		}
 	}
+	return res;
+}
+/*** END OPTIONS ***/
 
-	char* endptr;
+#define TRY(X, LABEL) X; if (*exit != 0) goto LABEL
 
-	long h = strtol(argv[1], &endptr, 10);
-	if (argv[1] == endptr) return 1;
+int main(int argc, char* argv[argc]) {
+	int code = 0;
+	int* exit = &code;
+	struct options opts = parse_opts(argc, argv);
+	if (opts.help) {
+		usage();
+		goto exit;
+	}
 
-	long w = strtol(argv[2], &endptr, 10);
-	if (argv[1] == endptr) return 1;
-
-	Table t = new_table(h, w);
+	long h = TRY(read_num(argv[1], exit), h);
+	long w = TRY(read_num(argv[2], exit), w);
+	Table t = table_init(h, w);
 
 	FILE* fd = fopen(argv[3], "r");
-	parse_table(&t, fd);
-	fclose(fd);
+	if (!fd) {
+		printf("ERROR IO: Could not open file \"%s\"\n", argv[3]);
+		*exit = 1;
+		goto deinit_table;
+	}
 
-	run_table(&t);
-	delete_table(t);
+	if (!table_from_fd(&t, fd)) {
+		*exit = 1;
+		goto close_fd;
+	}
+
+	table_run(&t);
+
+	// ERRORS
+close_fd:
+	fclose(fd);
+deinit_table:
+	table_deinit(t);
+w:
+	if (exit != 0) {
+		printf("ERROR PARSE: couldn't read number from string \"%s\"", argv[2]);
+		goto exit;
+	}
+h:
+	if (exit != 0) {
+		printf("ERROR PARSE: couldn't read number from string \"%s\"", argv[1]);
+		goto exit;
+	}
 exit:
-	return 0;
+	return *exit;
 }
