@@ -422,12 +422,12 @@ long read_num(char* str, int* success) {
 }
 
 /*** BEGIN OPTIONS ***/
-struct options {
+typedef struct {
 	bool help;
-};
+} Options;
 
-struct options parse_opts(int argc, char** argv) {
-	struct options res = (struct options) {
+Options parse_opts(int argc, char** argv) {
+	Options res = (Options) {
 		.help = false,
 	};
 	int opt;
@@ -451,7 +451,7 @@ struct options parse_opts(int argc, char** argv) {
 int main(int argc, char* argv[argc]) {
 	int code = 0;
 	int* exit = &code;
-	struct options opts = parse_opts(argc, argv);
+	Options opts = parse_opts(argc, argv);
 	if (opts.help) {
 		usage();
 		goto exit;
