@@ -220,9 +220,22 @@ void handle_goto(Table* t) {
 	}
 }
 
+char* op_to_str(Operation op) {
+	switch (op) {
+	case GOTO: return "goto";
+	case RUN_UP: return "run_up";
+	case RUN_LEFT: return "run_left";
+	case RUN_DOWN: return "run_down";
+	case RUN_RIGHT: return "run_right";
+	case SELECT: return "select";
+	case PRINT: return "print";
+	case HALT: return "halt";
+	}
+}
+
 void cell_print(Cell c) {
 	if (c.type == OP) {
-		printf("ERR PRINT: <OP> cannot be printed\n");
+		printf("ERR PRINT: Operation <%s> cannot be printed\n", op_to_str(c.op));
 	} else if (c.type == NUM) {
 		printf("%d", c.number);
 	} else if (c.type == CHAR) {
