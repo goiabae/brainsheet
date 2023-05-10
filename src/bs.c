@@ -393,11 +393,11 @@ bool table_from_fd(Table* t, FILE* fd) {
 		sscanf(buf, "%ld %ld %s\n", &x, &y, id_buf);
 
 		if (x > (t->w - 1)) {
-			printf("ERROR PARSE: cell (%ld, %ld) with coordinates exceeding table width\n", x, y);
+			printf("ERROR PARSE: index (%ld, %ld) exceeds table height\n", x, y);
 			return false;
 		}
 		if (y > (t->h - 1)) {
-			printf("ERROR PARSE: cell (%ld, %ld) with coordinates exceeding table height\n", x, y);
+			printf("ERROR PARSE: index (%ld, %ld) exceeds table height\n", x, y);
 			return false;
 		}
 
@@ -446,8 +446,6 @@ Options parse_opts(int argc, char** argv) {
 }
 /*** END OPTIONS ***/
 
-#define TRY(X, LABEL) X; if (*exit != 0) goto LABEL
-
 int main(int argc, char* argv[argc]) {
 	int code = 0;
 	int* exit = &code;
@@ -457,8 +455,18 @@ int main(int argc, char* argv[argc]) {
 		goto exit;
 	}
 
-	long h = TRY(read_num(argv[1], exit), h);
-	long w = TRY(read_num(argv[2], exit), w);
+	long h = read_num(argv[1], exit);
+	if (*exit != 0) {
+		printf("ERROR PARSE: couldn't read number from string \"%s\"", argv[1]);
+		goto exit;
+	}
+
+	long w = read_num(argv[2], exit);
+	if (*exit != 0) {
+		printf("ERROR PARSE: couldn't read number from string \"%s\"", argv[2]);
+		goto exit;
+	}
+
 	Table t = table_init(h, w);
 
 	FILE* fd = fopen(argv[3], "r");
@@ -475,21 +483,11 @@ int main(int argc, char* argv[argc]) {
 
 	table_run(&t);
 
-	// ERRORS
+	// defer
 close_fd:
 	fclose(fd);
 deinit_table:
 	table_deinit(t);
-w:
-	if (exit != 0) {
-		printf("ERROR PARSE: couldn't read number from string \"%s\"", argv[2]);
-		goto exit;
-	}
-h:
-	if (exit != 0) {
-		printf("ERROR PARSE: couldn't read number from string \"%s\"", argv[1]);
-		goto exit;
-	}
 exit:
 	return *exit;
 }
