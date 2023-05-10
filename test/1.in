@@ -16,3 +16,4 @@
 15 0 '\n'
 16 0 select
 17 0 print
+18 0 halt
