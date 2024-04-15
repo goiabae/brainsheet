@@ -403,7 +403,7 @@ bool table_from_fd(Table* t, FILE* fd) {
 
 		if (id_buf[0] == '\'')
 			parse_character(&t->cells[matrix_at(t->w, x, y)], id_buf);
-		else if ('0' >= id_buf[0] && id_buf[0] <= 0)
+		else if ('0' <= id_buf[0] && id_buf[0] <= '9')
 			parse_number(&t->cells[matrix_at(t->w, x, y)], id_buf);
 		else
 			parse_op(&t->cells[matrix_at(t->w, x, y)], id_buf);
