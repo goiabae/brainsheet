@@ -11,15 +11,15 @@ typedef struct Vec2 {
 	long y;
 } Vec2;
 
-typedef struct Dimension {
-	long height;
-	long width;
-} Dimension;
-
 typedef struct Selection {
 	Vec2 beg;
 	Vec2 end;
 } Selection;
+
+typedef struct Shape {
+	size_t len;
+	long* dimensions;
+} Shape;
 
 typedef struct SelectionNode {
 	struct SelectionNode* next;
@@ -136,17 +136,12 @@ void push_selection(SelectionChain* sels) {
 	return;
 }
 
-void pop_selection(SelectionChain* sels) {
+Selection pop_selection(SelectionChain* sels) {
+	Selection last = sels->head.sel;
 	SelectionNode* next = sels->list->next;
 	free(sels->list);
 	sels->list = next;
-}
-
-Dimension selection_dimensions(Selection s) {
-	return (Dimension) {
-		.height = 1 + ((s.end.y > s.beg.y) ? (s.end.y - s.beg.y) : (s.beg.y - s.end.y)),
-		.width = 1 + ((s.end.x > s.beg.x) ? (s.end.x - s.beg.x) : (s.beg.x - s.end.x)),
-	};
+	return last;
 }
 
 void end_selection(Table* t) {
@@ -192,40 +187,35 @@ void end_selection(Table* t) {
 	t->sels.is_selecting = false;
 }
 
+Shape selection_shape(Selection sel){
+	Shape shape;
+	shape.len = 2;
+	shape.dimensions = malloc(sizeof(long) * 2);
+	shape.dimensions[0] = sel.end.y - sel.beg.y + 1;
+	shape.dimensions[1] = sel.end.x - sel.beg.x + 1;
+	return shape;
+}
+
 void handle_goto(Table* t) {
-	Selection last = t->sels.list->sel;
-	Dimension last_dm = selection_dimensions(last);
-	bool len2_vec =
-		   (last_dm.height == 1 && last_dm.width == 2)
-		|| (last_dm.height == 2 && last_dm.width == 1)
-	;
+	Selection last = pop_selection(&t->sels);
+	Shape shape = selection_shape(last);
 
-	if (len2_vec) {
-		t->cur.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
-		t->cur.y = t->cells[matrix_at(t->w, last.end.x, last.end.y)].number;
+	assert(shape.dimensions[1] == 2 && "ERROR GOTO: Current selection is not a 1 dimensional vector of length 2\n");
+	t->cur.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
+	t->cur.y = t->cells[matrix_at(t->w, last.beg.x+1, last.beg.y)].number;
 
-		pop_selection(&t->sels);
-	} else {
-		printf("ERROR GOTO: Current selection is not a 1 dimensional vector of length 2\n");
-	}
+	free(shape.dimensions);
 }
 
 void handle_run(Table* t) {
-	Selection last = t->sels.list->sel;
-	Dimension last_dm = selection_dimensions(last);
-	bool len2_vec =
-		   (last_dm.height == 1 && last_dm.width == 2)
-		|| (last_dm.height == 2 && last_dm.width == 1)
-	;
+	Selection last = pop_selection(&t->sels);
+	Shape shape = selection_shape(last);
 
-	if (len2_vec) {
-		t->run.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
-		t->run.y = t->cells[matrix_at(t->w, last.end.x, last.end.y)].number;
+	assert(shape.dimensions[1] == 2 && shape.dimensions[0] == 1 && "ERROR GOTO: Current selection is not a vector of shape 2\n");
+	t->run.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
+	t->run.y = t->cells[matrix_at(t->w, last.beg.x+1, last.beg.y)].number;
 
-		pop_selection(&t->sels);
-	} else {
-		printf("ERROR GOTO: Current selection is not a 1 dimensional vector of length 2\n");
-	}
+	free(shape.dimensions);
 }
 
 char* op_to_str(Operation op) {
