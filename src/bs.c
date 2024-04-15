@@ -156,6 +156,37 @@ void end_selection(Table* t) {
 		t->cur.y - t->run.y,
 	};
 
+	// normalize selection with beg always smaller than end
+
+	// . . E
+	// . . .
+	// B . .
+	if (s.end.x >= s.beg.x && s.end.y < s.beg.y) {
+		long tmp = s.end.y;
+		s.end.y = s.beg.y;
+		s.beg.y = tmp;
+
+		// E . .
+		// . . .
+		// . . B
+	} else if (s.end.x < s.beg.x && s.end.y < s.beg.y) {
+		long tmp = s.end.y;
+		s.end.y = s.beg.y;
+		s.beg.y = tmp;
+
+		tmp = s.end.x;
+		s.end.x = s.beg.x;
+		s.beg.x = tmp;
+
+		// . . B
+		// . . .
+		// E . .
+	} else if (s.end.x < s.beg.x && s.end.y >= s.beg.y) {
+		long tmp = s.end.x;
+		s.end.x = s.beg.x;
+		s.beg.x = tmp;
+	}
+
 	t->sels.head.sel = s;
 	push_selection(&t->sels);
 	t->sels.is_selecting = false;
