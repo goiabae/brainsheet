@@ -344,6 +344,10 @@ void parse_character(Cell* cell, char buf[50]) {
 			c = '\n';
 		else if (buf[2] == 's')
 			c = ' ';
+		else {
+			printf("ERROR PARSE: Unknown escape sequence \"\\%c\"\n", buf[2]);
+			c = '\0';
+		}
 	} else c = buf[1];
 
 	cell->type = CHAR;
@@ -377,8 +381,9 @@ void parse_op(Cell* cell, char buf[50]) {
 		op = GOTO;
 	else if (!strcmp(buf, "halt"))
 		op = HALT;
-	else
-		printf("ERROR PARSE: Couldn't parse operation\n");
+	else {
+		printf("ERROR PARSE: Couldn't parse operation \"%s\"\n", buf);
+	}
 	cell->type = OP;
 	cell->op = op;
 }
