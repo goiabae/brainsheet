@@ -17,10 +17,8 @@ typedef struct Dimension {
 } Dimension;
 
 typedef struct Selection {
-	long x1;
-	long y1;
-	long x2;
-	long y2;
+	Vec2 beg;
+	Vec2 end;
 } Selection;
 
 typedef struct SelectionNode {
@@ -127,8 +125,7 @@ void begin_selection(Table* t) {
 	long x = t->cur.x + t->run.x;
 	long y = t->cur.y + t->run.y;
 	t->sels.is_selecting = true;
-	t->sels.head.sel.x1 = x;
-	t->sels.head.sel.y1 = y;
+	t->sels.head.sel.beg = (Vec2){x, y};
 }
 
 void push_selection(SelectionChain* sels) {
@@ -147,15 +144,17 @@ void pop_selection(SelectionChain* sels) {
 
 Dimension selection_dimensions(Selection s) {
 	return (Dimension) {
-		.height = 1 + ((s.y2 > s.y1) ? (s.y2 - s.y1) : (s.y1 - s.y2)),
-		.width = 1 + ((s.x2 > s.x1) ? (s.x2 - s.x1) : (s.x1 - s.x2)),
+		.height = 1 + ((s.end.y > s.beg.y) ? (s.end.y - s.beg.y) : (s.beg.y - s.end.y)),
+		.width = 1 + ((s.end.x > s.beg.x) ? (s.end.x - s.beg.x) : (s.beg.x - s.end.x)),
 	};
 }
 
 void end_selection(Table* t) {
 	Selection s = t->sels.head.sel;
-	s.x2 = t->cur.x - t->run.x;
-	s.y2 = t->cur.y - t->run.y;
+	s.end = (Vec2) {
+		t->cur.x - t->run.x,
+		t->cur.y - t->run.y,
+	};
 
 	t->sels.head.sel = s;
 	push_selection(&t->sels);
@@ -171,8 +170,8 @@ void handle_goto(Table* t) {
 	;
 
 	if (len2_vec) {
-		t->cur.x = t->cells[matrix_at(t->w, last.x1, last.y1)].number;
-		t->cur.y = t->cells[matrix_at(t->w, last.x2, last.y2)].number;
+		t->cur.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
+		t->cur.y = t->cells[matrix_at(t->w, last.end.x, last.end.y)].number;
 
 		pop_selection(&t->sels);
 	} else {
@@ -189,8 +188,8 @@ void handle_run(Table* t) {
 	;
 
 	if (len2_vec) {
-		t->run.x = t->cells[matrix_at(t->w, last.x1, last.y1)].number;
-		t->run.y = t->cells[matrix_at(t->w, last.x2, last.y2)].number;
+		t->run.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
+		t->run.y = t->cells[matrix_at(t->w, last.end.x, last.end.y)].number;
 
 		pop_selection(&t->sels);
 	} else {
@@ -224,23 +223,23 @@ void cell_print(Cell c) {
 
 void print_selection(Table* t) {
 	Selection last = t->sels.list->sel;
-	bool x_increasing = last.x1 <= last.x2;
-	bool y_increasing = last.x1 <= last.y2;
+	bool x_increasing = last.beg.x <= last.end.x;
+	bool y_increasing = last.beg.x <= last.end.y;
 
 	if (! x_increasing) {
-		long tmp = last.x1;
-	  last.x1 = last.x2;
-		last.x2 = tmp;
+		long tmp = last.beg.x;
+	  last.beg.x = last.end.x;
+		last.end.x = tmp;
 	}
 
 	if (! y_increasing) {
-		long tmp = last.y1;
-	  last.y1 = last.y2;
-		last.y2 = tmp;
+		long tmp = last.beg.y;
+	  last.beg.y = last.end.y;
+		last.end.y = tmp;
 	}
 
-	for (int i = last.y1; i <= last.y2; i++) {
-		for (int j = last.x1; j <= last.x2; j++) {
+	for (int i = last.beg.y; i <= last.end.y; i++) {
+		for (int j = last.beg.x; j <= last.end.x; j++) {
 			cell_print(t->cells[matrix_at(t->w, j, i)]);
 		}
 	}
