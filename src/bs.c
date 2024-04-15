@@ -1,10 +1,10 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <string.h>
 #include <assert.h>
-#include <getopt.h>
 #include <errno.h>
+#include <getopt.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct Vec2 {
 	long x;
@@ -47,14 +47,6 @@ typedef enum Operation {
 	HALT,
 } Operation;
 
-typedef enum Direction {
-	UP,
-	LEFT,
-	DOWN,
-	RIGHT,
-	STILL,
-} Direction;
-
 typedef enum Type {
 	NIL,
 	OP,
@@ -81,28 +73,27 @@ typedef struct Table {
 	Cell* cells;
 } Table;
 
-long matrix_at(long w, long x, long y) {
-	return w * y + x;
-}
+long matrix_at(long w, long x, long y) { return w * y + x; }
 
 Table table_init(long h, long w) {
 	Table t = {
 		.h = h,
 		.w = w,
-		.cur = (Vec2) { 0, 0 },
+		.cur = (Vec2) {0, 0},
 		.is_halt = false,
-		.sels = (SelectionChain) {
-			.is_selecting = false,
-			.list = NULL,
-		},
-		.run = (Vec2) { 0, 0 },
+		.sels =
+			(SelectionChain) {
+				.is_selecting = false,
+				.list = NULL,
+			},
+		.run = (Vec2) {0, 0},
 		.cells = malloc(sizeof(Cell) * h * w),
 	};
 
 	assert(t.cells);
 
-	for (int i = 0; i < h; i ++) {
-		for (int j = 0; j < w; j ++) {
+	for (int i = 0; i < h; i++) {
+		for (int j = 0; j < w; j++) {
 			t.cells[matrix_at(t.w, i, j)].type = NIL;
 		}
 	}
@@ -125,13 +116,13 @@ void begin_selection(Table* t) {
 	long x = t->cur.x + t->run.x;
 	long y = t->cur.y + t->run.y;
 	t->sels.is_selecting = true;
-	t->sels.head.sel.beg = (Vec2){x, y};
+	t->sels.head.sel.beg = (Vec2) {x, y};
 }
 
 void push_selection(SelectionChain* sels) {
 	sels->head.next = sels->list;
 	sels->list = malloc(sizeof(SelectionNode));
-	sels->list->next  = sels->head.next;
+	sels->list->next = sels->head.next;
 	sels->list->sel = sels->head.sel;
 	return;
 }
@@ -187,7 +178,7 @@ void end_selection(Table* t) {
 	t->sels.is_selecting = false;
 }
 
-Shape selection_shape(Selection sel){
+Shape selection_shape(Selection sel) {
 	Shape shape;
 	shape.len = 2;
 	shape.dimensions = malloc(sizeof(long) * 2);
@@ -202,7 +193,7 @@ void handle_goto(Table* t) {
 
 	assert(shape.dimensions[1] == 2 && "ERROR GOTO: Current selection is not a 1 dimensional vector of length 2\n");
 	t->cur.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
-	t->cur.y = t->cells[matrix_at(t->w, last.beg.x+1, last.beg.y)].number;
+	t->cur.y = t->cells[matrix_at(t->w, last.beg.x + 1, last.beg.y)].number;
 
 	free(shape.dimensions);
 }
@@ -211,24 +202,27 @@ void handle_run(Table* t) {
 	Selection last = pop_selection(&t->sels);
 	Shape shape = selection_shape(last);
 
-	assert(shape.dimensions[1] == 2 && shape.dimensions[0] == 1 && "ERROR GOTO: Current selection is not a vector of shape 2\n");
+	assert(
+		shape.dimensions[1] == 2 && shape.dimensions[0] == 1
+		&& "ERROR GOTO: Current selection is not a vector of shape 2\n"
+	);
 	t->run.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
-	t->run.y = t->cells[matrix_at(t->w, last.beg.x+1, last.beg.y)].number;
+	t->run.y = t->cells[matrix_at(t->w, last.beg.x + 1, last.beg.y)].number;
 
 	free(shape.dimensions);
 }
 
 char* op_to_str(Operation op) {
 	switch (op) {
-	case GOTO: return "goto";
-	case RUN_UP: return "run_up";
-	case RUN_LEFT: return "run_left";
-	case RUN_DOWN: return "run_down";
-	case RUN_RIGHT: return "run_right";
-	case SELECT: return "select";
-	case PRINT: return "print";
-	case HALT: return "halt";
-	default: return "";
+		case GOTO: return "goto";
+		case RUN_UP: return "run_up";
+		case RUN_LEFT: return "run_left";
+		case RUN_DOWN: return "run_down";
+		case RUN_RIGHT: return "run_right";
+		case SELECT: return "select";
+		case PRINT: return "print";
+		case HALT: return "halt";
+		default: return "";
 	}
 }
 
@@ -247,15 +241,15 @@ void print_selection(Table* t) {
 	bool x_increasing = last.beg.x <= last.end.x;
 	bool y_increasing = last.beg.x <= last.end.y;
 
-	if (! x_increasing) {
+	if (!x_increasing) {
 		long tmp = last.beg.x;
-	  last.beg.x = last.end.x;
+		last.beg.x = last.end.x;
 		last.end.x = tmp;
 	}
 
-	if (! y_increasing) {
+	if (!y_increasing) {
 		long tmp = last.beg.y;
-	  last.beg.y = last.end.y;
+		last.beg.y = last.end.y;
 		last.end.y = tmp;
 	}
 
@@ -271,42 +265,33 @@ void print_selection(Table* t) {
 
 void run_op(Table* t) {
 	switch (t->cells[matrix_at(t->w, t->cur.x, t->cur.y)].op) {
-	case GOTO:
-		handle_goto(t);
-		break;
+		case GOTO: handle_goto(t); break;
 
-	case RUN:
-		handle_run(t);
-		break;
+		case RUN: handle_run(t); break;
 
-	case RUN_UP:    t->run = (Vec2) { 0, -1 }; break;
-	case RUN_LEFT:  t->run = (Vec2) { -1, 0 }; break;
-	case RUN_DOWN:  t->run = (Vec2) { 0, 1 }; break;
-	case RUN_RIGHT: t->run = (Vec2) { 1, 0 }; break;
+		case RUN_UP: t->run = (Vec2) {0, -1}; break;
+		case RUN_LEFT: t->run = (Vec2) {-1, 0}; break;
+		case RUN_DOWN: t->run = (Vec2) {0, 1}; break;
+		case RUN_RIGHT: t->run = (Vec2) {1, 0}; break;
 
-	case SELECT:
-		if (t->sels.is_selecting)
-			end_selection(t);
-		else
-		  begin_selection(t);
-		break;
-	case PRINT:
-		print_selection(t);
-		break;
-	case HALT:
-		t->is_halt = true;
-		break;
+		case SELECT:
+			if (t->sels.is_selecting)
+				end_selection(t);
+			else
+				begin_selection(t);
+			break;
+		case PRINT: print_selection(t); break;
+		case HALT: t->is_halt = true; break;
 	}
 	return;
 }
 
 void table_run(Table* t) {
-	while (! t->is_halt) {
+	while (!t->is_halt) {
 		long i = matrix_at(t->w, t->cur.x, t->cur.y);
 		if (t->cells[i].type == OP) {
 			run_op(t);
-			if (t->cells[i].op == GOTO)
-				continue;
+			if (t->cells[i].op == GOTO) continue;
 		}
 
 		t->cur.x += t->run.x;
@@ -324,19 +309,19 @@ void usage() {
 }
 
 void set_op_cell(Table* t, long x, long y, Operation op) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) { .type = OP, .op = op };
+	t->cells[matrix_at(t->w, x, y)] = (Cell) {.type = OP, .op = op};
 }
 
 void set_nil_cell(Table* t, long x, long y) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) { NIL };
+	t->cells[matrix_at(t->w, x, y)] = (Cell) {NIL};
 }
 
 void set_number_cell(Table* t, long x, long y, Number num) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) { .type = NUM, .number = num };
+	t->cells[matrix_at(t->w, x, y)] = (Cell) {.type = NUM, .number = num};
 }
 
 void set_character_cell(Table* t, long x, long y, Character car) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) { .type = CHAR, .character = car };
+	t->cells[matrix_at(t->w, x, y)] = (Cell) {.type = CHAR, .character = car};
 }
 
 void parse_character(Cell* cell, char buf[50]) {
@@ -351,7 +336,8 @@ void parse_character(Cell* cell, char buf[50]) {
 			printf("ERROR PARSE: Unknown escape sequence \"\\%c\"\n", buf[2]);
 			c = '\0';
 		}
-	} else c = buf[1];
+	} else
+		c = buf[1];
 
 	cell->type = CHAR;
 	cell->character = c;
@@ -360,8 +346,7 @@ void parse_character(Cell* cell, char buf[50]) {
 void parse_number(Cell* cell, char buf[50]) {
 	char* endptr;
 	long n = strtol(buf, &endptr, 10);
-	if (buf == endptr)
-		printf("ERROR PARSE: Couldn't parse number\n");
+	if (buf == endptr) printf("ERROR PARSE: Couldn't parse number\n");
 	cell->type = NUM;
 	cell->number = n;
 }
@@ -442,14 +427,11 @@ Options parse_opts(int argc, char** argv) {
 	};
 	int opt;
 
-	if ((argc - 1) < 3)
-		res.help = true;
+	if ((argc - 1) < 3) res.help = true;
 
 	while (-1 != (opt = getopt(argc, argv, "h"))) {
 		switch (opt) {
-		case 'h':
-			res.help = true;
-			break;
+			case 'h': res.help = true; break;
 		}
 	}
 	return res;
