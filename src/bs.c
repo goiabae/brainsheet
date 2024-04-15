@@ -6,6 +6,11 @@
 #include <getopt.h>
 #include <errno.h>
 
+typedef struct Vec2 {
+	long x;
+	long y;
+} Vec2;
+
 typedef struct Dimension {
 	long height;
 	long width;
@@ -34,6 +39,7 @@ typedef char Character;
 
 typedef enum Operation {
 	GOTO,
+	RUN,
 	RUN_UP,
 	RUN_LEFT,
 	RUN_DOWN,
@@ -70,11 +76,10 @@ typedef struct Cell {
 typedef struct Table {
 	long h;
 	long w;
-	long cx;
-	long cy;
+	Vec2 cur;
 	bool is_halt;
 	SelectionChain sels;
-	Direction run;
+	Vec2 run;
 	Cell* cells;
 } Table;
 
@@ -86,14 +91,13 @@ Table table_init(long h, long w) {
 	Table t = {
 		.h = h,
 		.w = w,
-		.cx = 0,
-		.cy = 0,
+		.cur = (Vec2) { 0, 0 },
 		.is_halt = false,
 		.sels = (SelectionChain) {
 			.is_selecting = false,
 			.list = NULL,
 		},
-		.run = STILL,
+		.run = (Vec2) { 0, 0 },
 		.cells = malloc(sizeof(Cell) * h * w),
 	};
 
@@ -120,29 +124,8 @@ void table_deinit(Table t) {
 }
 
 void begin_selection(Table* t) {
-	long x;
-	long y;
-	switch (t->run) {
-	case UP:
-		x = t->cx;
-		y = t->cy - 1;
-		break;
-	case LEFT:
-		x = t->cx - 1;
-		y = t->cy;
-		break;
-	case DOWN:
-		x = t->cx;
-		y = t->cy + 1;
-		break;
-	case RIGHT:
-		x = t->cx + 1;
-		y = t->cy;
-		break;
-	case STILL:
-		assert(t->run != STILL);
-		break;
-	}
+	long x = t->cur.x + t->run.x;
+	long y = t->cur.y + t->run.y;
 	t->sels.is_selecting = true;
 	t->sels.head.sel.x1 = x;
 	t->sels.head.sel.y1 = y;
@@ -164,55 +147,50 @@ void pop_selection(SelectionChain* sels) {
 
 Dimension selection_dimensions(Selection s) {
 	return (Dimension) {
-		.height = (s.y2 > s.y1) ? (s.y2 - s.y1) : (s.y1 - s.y2),
-		.width = (s.x2 > s.x1) ? (s.x2 - s.x1) : (s.x1 - s.x2),
+		.height = 1 + ((s.y2 > s.y1) ? (s.y2 - s.y1) : (s.y1 - s.y2)),
+		.width = 1 + ((s.x2 > s.x1) ? (s.x2 - s.x1) : (s.x1 - s.x2)),
 	};
 }
 
 void end_selection(Table* t) {
-	Direction dir = t->run;
-	bool x_increasing = t->sels.head.sel.x1 <= t->cx;
-	bool y_increasing = t->sels.head.sel.y1 <= t->cy;
-
 	Selection s = t->sels.head.sel;
-	s.x2 = t->cx;
-	s.y2 = t->cy;
+	s.x2 = t->cur.x - t->run.x;
+	s.y2 = t->cur.y - t->run.y;
 
-	Dimension d = selection_dimensions(s);
-
-	if (d.height == 0) {
-		(x_increasing) ? s.x2-- : s.x2++;
-		goto ret;
-	}
-
-	if (d.width == 0) {
-		(y_increasing) ? s.y2-- : s.y2++;
-		goto ret;
-	}
-
-	if (dir == UP || dir == DOWN)
-		(x_increasing) ? s.x2-- : s.y2++;
-	else if (dir == LEFT || dir == RIGHT)
-		(y_increasing) ? s.y2-- : s.y2++;
-
-ret:
 	t->sels.head.sel = s;
 	push_selection(&t->sels);
 	t->sels.is_selecting = false;
 }
 
 void handle_goto(Table* t) {
-	long x, y;
 	Selection last = t->sels.list->sel;
 	Dimension last_dm = selection_dimensions(last);
 	bool len2_vec =
-		   last_dm.height == 0 && last_dm.width == 2
-		|| last_dm.height == 2 && last_dm.width
+		   (last_dm.height == 1 && last_dm.width == 2)
+		|| (last_dm.height == 2 && last_dm.width == 1)
 	;
 
 	if (len2_vec) {
-		t->cx = t->cells[matrix_at(t->w, last.x1, last.y1)].number;
-		t->cy = t->cells[matrix_at(t->w, last.x2, last.y2)].number;
+		t->cur.x = t->cells[matrix_at(t->w, last.x1, last.y1)].number;
+		t->cur.y = t->cells[matrix_at(t->w, last.x2, last.y2)].number;
+
+		pop_selection(&t->sels);
+	} else {
+		printf("ERROR GOTO: Current selection is not a 1 dimensional vector of length 2\n");
+	}
+}
+
+void handle_run(Table* t) {
+	Selection last = t->sels.list->sel;
+	Dimension last_dm = selection_dimensions(last);
+	bool len2_vec =
+		   (last_dm.height == 1 && last_dm.width == 2)
+		|| (last_dm.height == 2 && last_dm.width == 1)
+	;
+
+	if (len2_vec) {
+		t->run.x = t->cells[matrix_at(t->w, last.x1, last.y1)].number;
+		t->run.y = t->cells[matrix_at(t->w, last.x2, last.y2)].number;
 
 		pop_selection(&t->sels);
 	} else {
@@ -230,6 +208,7 @@ char* op_to_str(Operation op) {
 	case SELECT: return "select";
 	case PRINT: return "print";
 	case HALT: return "halt";
+	default: return "";
 	}
 }
 
@@ -245,7 +224,6 @@ void cell_print(Cell c) {
 
 void print_selection(Table* t) {
 	Selection last = t->sels.list->sel;
-	Dimension last_dm = selection_dimensions(last);
 	bool x_increasing = last.x1 <= last.x2;
 	bool y_increasing = last.x1 <= last.y2;
 
@@ -272,15 +250,19 @@ void print_selection(Table* t) {
 }
 
 void run_op(Table* t) {
-	switch (t->cells[matrix_at(t->w, t->cx, t->cy)].op) {
+	switch (t->cells[matrix_at(t->w, t->cur.x, t->cur.y)].op) {
 	case GOTO:
 		handle_goto(t);
 		break;
 
-	case RUN_UP:    t->run = UP;    break;
-	case RUN_LEFT:  t->run = LEFT;  break;
-	case RUN_DOWN:  t->run = DOWN;  break;
-	case RUN_RIGHT: t->run = RIGHT; break;
+	case RUN:
+		handle_run(t);
+		break;
+
+	case RUN_UP:    t->run = (Vec2) { 0, -1 }; break;
+	case RUN_LEFT:  t->run = (Vec2) { -1, 0 }; break;
+	case RUN_DOWN:  t->run = (Vec2) { 0, 1 }; break;
+	case RUN_RIGHT: t->run = (Vec2) { 1, 0 }; break;
 
 	case SELECT:
 		if (t->sels.is_selecting)
@@ -300,14 +282,15 @@ void run_op(Table* t) {
 
 void table_run(Table* t) {
 	while (! t->is_halt) {
-		if (t->cells[matrix_at(t->w, t->cx, t->cy)].type == OP) {
+		long i = matrix_at(t->w, t->cur.x, t->cur.y);
+		if (t->cells[i].type == OP) {
 			run_op(t);
+			if (t->cells[i].op == GOTO)
+				continue;
 		}
 
-		if      (t->run == UP)    t->cy--;
-		else if (t->run == LEFT)  t->cx--;
-		else if (t->run == DOWN)  t->cy++;
-		else if (t->run == RIGHT) t->cx++;
+		t->cur.x += t->run.x;
+		t->cur.y += t->run.y;
 	}
 }
 
@@ -369,6 +352,8 @@ void parse_op(Cell* cell, char buf[50]) {
 		op = SELECT;
 	else if (!strcmp(buf, "print"))
 		op = PRINT;
+	else if (!strcmp(buf, "run"))
+		op = RUN;
 	else if (!strcmp(buf, "up"))
 		op = RUN_UP;
 	else if (!strcmp(buf, "right"))
