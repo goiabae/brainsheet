@@ -119,16 +119,16 @@ void begin_selection(Table* t) {
 	t->sels.head.sel.beg = (Vec2) {x, y};
 }
 
-void push_selection(SelectionChain* sels) {
+void push_selection(SelectionChain* sels, Selection sel) {
 	sels->head.next = sels->list;
 	sels->list = malloc(sizeof(SelectionNode));
 	sels->list->next = sels->head.next;
-	sels->list->sel = sels->head.sel;
+	sels->list->sel = sel;
 	return;
 }
 
 Selection pop_selection(SelectionChain* sels) {
-	Selection last = sels->head.sel;
+	Selection last = sels->list->sel;
 	SelectionNode* next = sels->list->next;
 	free(sels->list);
 	sels->list = next;
@@ -174,16 +174,25 @@ void end_selection(Table* t) {
 	}
 
 	t->sels.head.sel = s;
-	push_selection(&t->sels);
+	push_selection(&t->sels, s);
 	t->sels.is_selecting = false;
 }
 
 Shape selection_shape(Selection sel) {
 	Shape shape;
-	shape.len = 2;
-	shape.dimensions = malloc(sizeof(long) * 2);
-	shape.dimensions[0] = sel.end.y - sel.beg.y + 1;
-	shape.dimensions[1] = sel.end.x - sel.beg.x + 1;
+	if (sel.beg.y == sel.end.y && sel.beg.x == sel.end.x) {
+		shape.len = 0;
+		shape.dimensions = NULL;
+	} else if (sel.beg.y == sel.end.y) {
+		shape.len = 1;
+		shape.dimensions = malloc(sizeof(long) * 1);
+		shape.dimensions[0] = sel.end.x - sel.beg.x + 1;
+	} else {
+		shape.len = 2;
+		shape.dimensions = malloc(sizeof(long) * 2);
+		shape.dimensions[0] = sel.end.y - sel.beg.y + 1;
+		shape.dimensions[1] = sel.end.x - sel.beg.x + 1;
+	}
 	return shape;
 }
 
@@ -219,11 +228,12 @@ char* op_to_str(Operation op) {
 		case RUN_LEFT: return "run_left";
 		case RUN_DOWN: return "run_down";
 		case RUN_RIGHT: return "run_right";
+		case RUN: return "run";
 		case SELECT: return "select";
 		case PRINT: return "print";
 		case HALT: return "halt";
-		default: return "";
 	}
+	assert(false);
 }
 
 void cell_print(Cell c) {
@@ -373,6 +383,7 @@ void parse_op(Cell* cell, char buf[50]) {
 		op = HALT;
 	else {
 		printf("ERROR PARSE: Couldn't parse operation \"%s\"\n", buf);
+		assert(false);
 	}
 	cell->type = OP;
 	cell->op = op;
@@ -384,7 +395,8 @@ bool table_from_fd(Table* t, FILE* fd) {
 	char id_buf[50];
 
 	while (!feof(fd)) {
-		fgets(buf, 50, fd);
+		char* res = fgets(buf, 50, fd);
+		if (!res) return true;
 		sscanf(buf, "%ld %ld %s\n", &x, &y, id_buf);
 
 		if (x > (t->w - 1)) {
