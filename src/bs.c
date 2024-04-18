@@ -73,7 +73,7 @@ typedef struct Table {
 	Cell* cells;
 } Table;
 
-long matrix_at(long w, long x, long y) { return w * y + x; }
+long table_at(long w, long x, long y) { return w * y + x; }
 
 Table table_init(long h, long w) {
 	Table t = {
@@ -94,7 +94,7 @@ Table table_init(long h, long w) {
 
 	for (int i = 0; i < h; i++) {
 		for (int j = 0; j < w; j++) {
-			t.cells[matrix_at(t.w, i, j)].type = NIL;
+			t.cells[table_at(t.w, i, j)].type = NIL;
 		}
 	}
 
@@ -192,8 +192,8 @@ void handle_goto(Table* t) {
 	Shape shape = selection_shape(last);
 
 	assert(shape.dimensions[1] == 2 && "ERROR GOTO: Current selection is not a 1 dimensional vector of length 2\n");
-	t->cur.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
-	t->cur.y = t->cells[matrix_at(t->w, last.beg.x + 1, last.beg.y)].number;
+	t->cur.x = t->cells[table_at(t->w, last.beg.x, last.beg.y)].number;
+	t->cur.y = t->cells[table_at(t->w, last.beg.x + 1, last.beg.y)].number;
 
 	free(shape.dimensions);
 }
@@ -206,8 +206,8 @@ void handle_run(Table* t) {
 		shape.dimensions[1] == 2 && shape.dimensions[0] == 1
 		&& "ERROR GOTO: Current selection is not a vector of shape 2\n"
 	);
-	t->run.x = t->cells[matrix_at(t->w, last.beg.x, last.beg.y)].number;
-	t->run.y = t->cells[matrix_at(t->w, last.beg.x + 1, last.beg.y)].number;
+	t->run.x = t->cells[table_at(t->w, last.beg.x, last.beg.y)].number;
+	t->run.y = t->cells[table_at(t->w, last.beg.x + 1, last.beg.y)].number;
 
 	free(shape.dimensions);
 }
@@ -255,7 +255,7 @@ void print_selection(Table* t) {
 
 	for (int i = last.beg.y; i <= last.end.y; i++) {
 		for (int j = last.beg.x; j <= last.end.x; j++) {
-			cell_print(t->cells[matrix_at(t->w, j, i)]);
+			cell_print(t->cells[table_at(t->w, j, i)]);
 		}
 	}
 
@@ -264,7 +264,7 @@ void print_selection(Table* t) {
 }
 
 void run_op(Table* t) {
-	switch (t->cells[matrix_at(t->w, t->cur.x, t->cur.y)].op) {
+	switch (t->cells[table_at(t->w, t->cur.x, t->cur.y)].op) {
 		case GOTO: handle_goto(t); break;
 
 		case RUN: handle_run(t); break;
@@ -288,7 +288,7 @@ void run_op(Table* t) {
 
 void table_run(Table* t) {
 	while (!t->is_halt) {
-		long i = matrix_at(t->w, t->cur.x, t->cur.y);
+		long i = table_at(t->w, t->cur.x, t->cur.y);
 		if (t->cells[i].type == OP) {
 			run_op(t);
 			if (t->cells[i].op == GOTO) continue;
@@ -309,19 +309,19 @@ void usage() {
 }
 
 void set_op_cell(Table* t, long x, long y, Operation op) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) {.type = OP, .op = op};
+	t->cells[table_at(t->w, x, y)] = (Cell) {.type = OP, .op = op};
 }
 
 void set_nil_cell(Table* t, long x, long y) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) {NIL};
+	t->cells[table_at(t->w, x, y)] = (Cell) {NIL};
 }
 
 void set_number_cell(Table* t, long x, long y, Number num) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) {.type = NUM, .number = num};
+	t->cells[table_at(t->w, x, y)] = (Cell) {.type = NUM, .number = num};
 }
 
 void set_character_cell(Table* t, long x, long y, Character car) {
-	t->cells[matrix_at(t->w, x, y)] = (Cell) {.type = CHAR, .character = car};
+	t->cells[table_at(t->w, x, y)] = (Cell) {.type = CHAR, .character = car};
 }
 
 void parse_character(Cell* cell, char buf[50]) {
@@ -397,11 +397,11 @@ bool table_from_fd(Table* t, FILE* fd) {
 		}
 
 		if (id_buf[0] == '\'')
-			parse_character(&t->cells[matrix_at(t->w, x, y)], id_buf);
+			parse_character(&t->cells[table_at(t->w, x, y)], id_buf);
 		else if ('0' <= id_buf[0] && id_buf[0] <= '9')
-			parse_number(&t->cells[matrix_at(t->w, x, y)], id_buf);
+			parse_number(&t->cells[table_at(t->w, x, y)], id_buf);
 		else
-			parse_op(&t->cells[matrix_at(t->w, x, y)], id_buf);
+			parse_op(&t->cells[table_at(t->w, x, y)], id_buf);
 	}
 	return true;
 }
