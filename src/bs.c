@@ -221,6 +221,63 @@ void handle_run(Table* t) {
 	free(shape.dimensions);
 }
 
+Selection selection_at(Selection sel, size_t i) {
+	if (sel.beg.y == sel.end.y)
+		return (Selection) {
+			.beg.x = sel.beg.x + i,
+			.beg.y = sel.beg.y,
+			.end.x = sel.beg.x + i,
+			.end.y = sel.end.y,
+		};
+	else
+		return (Selection) {
+			.beg.x = sel.beg.x,
+			.beg.y = sel.beg.y + i,
+			.end.x = sel.end.x,
+			.end.y = sel.beg.y + i};
+}
+
+void replicate(
+	void (*func)(Table*, Selection*, size_t), Table* t, Selection* args,
+	size_t arg_count, size_t* ranks
+) {
+	size_t outer_shape = 0;
+	size_t max_rank = 0;
+	bool should_apply = true;
+
+	for (size_t i = 0; i < arg_count; i++) {
+		Shape shape = selection_shape(args[i]);
+		if (shape.len != ranks[i]) should_apply = false;
+		if (shape.len > max_rank) {
+			max_rank = shape.len;
+			outer_shape = shape.dimensions[0];
+		}
+		free(shape.dimensions); // shape_deinit
+	}
+
+	if (should_apply)
+		func(t, args, arg_count);
+	else {
+		Selection* rep_args = malloc(sizeof(Selection) * arg_count);
+
+		for (size_t i = 0; i < outer_shape; i++) {
+			for (size_t j = 0; j < arg_count; j++) {
+				Shape shape = selection_shape(args[j]);
+				if (shape.len > ranks[j] && shape.len == max_rank)
+					rep_args[j] = selection_at(args[j], i);
+				else {
+					assert(shape.len == ranks[j]);
+					rep_args[j] = args[j];
+				}
+				free(shape.dimensions); // shape_deinit
+			}
+			replicate(func, t, rep_args, arg_count, ranks);
+		}
+
+		free(rep_args);
+	}
+}
+
 char* op_to_str(Operation op) {
 	switch (op) {
 		case GOTO: return "goto";
