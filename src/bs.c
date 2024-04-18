@@ -45,6 +45,7 @@ typedef enum Operation {
 	SELECT,
 	PRINT,
 	HALT,
+	ADD,
 } Operation;
 
 typedef enum Type {
@@ -278,6 +279,26 @@ void replicate(
 	}
 }
 
+void add(Table* t, Selection* args, size_t arg_count) {
+	assert(arg_count == 3);
+	Cell* z = &t->cells[table_at(t->w, args[0].beg.x, args[0].beg.y)];
+	Cell y = t->cells[table_at(t->w, args[1].beg.x, args[1].beg.y)];
+	Cell x = t->cells[table_at(t->w, args[2].beg.x, args[2].beg.y)];
+	z->number = x.number + y.number;
+}
+
+// z y x -- z
+// x + y = z
+void handle_add(Table* t) {
+	Selection args[3];
+	args[0] = pop_selection(&t->sels); // z rank 0
+	args[1] = pop_selection(&t->sels); // y rank 0
+	args[2] = pop_selection(&t->sels); // x rank 0
+
+	replicate(add, t, args, 3, (size_t[3]) {0, 0, 0});
+	push_selection(&t->sels, args[0]); // push back z
+}
+
 char* op_to_str(Operation op) {
 	switch (op) {
 		case GOTO: return "goto";
@@ -289,6 +310,7 @@ char* op_to_str(Operation op) {
 		case SELECT: return "select";
 		case PRINT: return "print";
 		case HALT: return "halt";
+		case ADD: return "add";
 	}
 	assert(false);
 }
@@ -349,6 +371,7 @@ void run_op(Table* t) {
 			break;
 		case PRINT: print_selection(t); break;
 		case HALT: t->is_halt = true; break;
+		case ADD: handle_add(t); break;
 	}
 	return;
 }
@@ -438,6 +461,8 @@ void parse_op(Cell* cell, char buf[50]) {
 		op = GOTO;
 	else if (!strcmp(buf, "halt"))
 		op = HALT;
+	else if (!strcmp(buf, "add"))
+		op = ADD;
 	else {
 		printf("ERROR PARSE: Couldn't parse operation \"%s\"\n", buf);
 		assert(false);
